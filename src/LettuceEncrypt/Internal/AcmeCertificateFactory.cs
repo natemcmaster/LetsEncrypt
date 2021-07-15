@@ -32,6 +32,7 @@ namespace LettuceEncrypt.Internal
         private readonly ILogger _logger;
         private readonly IHostApplicationLifetime _appLifetime;
         private readonly TlsAlpnChallengeResponder _tlsAlpnChallengeResponder;
+        private readonly IEnumerable<IAdditionalIssuersSource> _additionalIssuersSources;
         private readonly TaskCompletionSource<object?> _appStarted = new();
         private AcmeClient? _client;
         private IKey? _acmeAccountKey;
@@ -45,6 +46,7 @@ namespace LettuceEncrypt.Internal
             IHostApplicationLifetime appLifetime,
             TlsAlpnChallengeResponder tlsAlpnChallengeResponder,
             ICertificateAuthorityConfiguration certificateAuthority,
+            IEnumerable<IAdditionalIssuersSource> additionalIssuersSources,
             IAccountStore? accountRepository = null)
         {
             _acmeClientFactory = acmeClientFactory;
@@ -61,6 +63,7 @@ namespace LettuceEncrypt.Internal
                 _appStarted.TrySetResult(null);
             }
 
+            _additionalIssuersSources = additionalIssuersSources;
             _accountRepository = accountRepository ?? new FileSystemAccountStore(logger, certificateAuthority);
         }
 
@@ -296,6 +299,17 @@ namespace LettuceEncrypt.Internal
             _logger.LogAcmeAction("NewCertificate");
 
             var pfxBuilder = acmeCert.ToPfx(privateKey);
+
+
+            foreach (var additionalIssuersSource in _additionalIssuersSources)
+            {
+                var additionalIssuers = await additionalIssuersSource.GetAdditionalIssuersAsync(cancellationToken);
+                foreach (var cert in additionalIssuers)
+                {
+                    pfxBuilder.AddIssuer(cert.RawData);
+                }
+            }
+
             var pfx = pfxBuilder.Build("HTTPS Cert - " + _options.Value.DomainNames, string.Empty);
             return new X509Certificate2(pfx, string.Empty, X509KeyStorageFlags.Exportable);
         }

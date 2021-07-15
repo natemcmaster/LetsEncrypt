@@ -78,5 +78,6 @@ namespace LettuceEncrypt
         /// Defaults to <see cref="ChallengeType.Any"/>.
         /// </summary>
         public ChallengeType AllowedChallengeTypes { get; set; } = ChallengeType.Any;
+
     }
 }
